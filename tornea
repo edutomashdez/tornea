@@ -1,0 +1,77 @@
+import streamlit as st
+import pandas as pd
+import random
+
+# Configuración de la página para móvil
+st.set_page_config(page_title="Padel Tournament Pro", layout="centered")
+
+st.title("🎾 Gestor de Mini Torneos")
+
+# --- PERSISTENCIA DE DATOS ---
+# Usamos session_state para que los datos no se borren al refrescar
+if 'torneo_creado' not in st.session_state:
+    st.session_state.torneo_creado = False
+if 'partidos' not in st.session_state:
+    st.session_state.partidos = []
+
+# --- FORMULARIO DE INICIO ---
+if not st.session_state.torneo_creado:
+    with st.form("setup"):
+        jugadores_raw = st.text_area("Introduce los nombres de los jugadores (uno por línea):", 
+                                     placeholder="Ejemplo:\nJuan\nPedro\nLuis\nCarlos")
+        btn_crear = st.form_submit_button("Generar Torneo")
+        
+        if btn_crear:
+            lista = [j.strip() for j in jugadores_raw.split('\n') if j.strip()]
+            if len(lista) < 4 or len(lista) % 2 != 0:
+                st.error("Necesitas un número par de jugadores (mínimo 4).")
+            else:
+                # Lógica simple de cruce aleatorio
+                random.shuffle(lista)
+                parejas = [(lista[i], lista[i+1]) for i in range(0, len(lista), 2)]
+                
+                # Generar enfrentamientos (Round Robin simple o eliminación)
+                partidos = []
+                for i in range(len(parejas)):
+                    for j in range(i + 1, len(parejas)):
+                        partidos.append({
+                            "id": f"{i}-{j}",
+                            "pareja1": f"{parejas[i][0]} & {parejas[i][1]}",
+                            "pareja2": f"{parejas[j][0]} & {parejas[j][1]}",
+                            "resultado1": 0,
+                            "resultado2": 0,
+                            "jugado": False
+                        })
+                
+                st.session_state.partidos = partidos
+                st.session_state.torneo_creado = True
+                st.rerun()
+
+# --- INTERFAZ DEL TORNEO ---
+else:
+    st.header("🏆 Partidos y Resultados")
+    
+    if st.button("⬅️ Reiniciar Torneo"):
+        st.session_state.torneo_creado = False
+        st.rerun()
+
+    for idx, partido in enumerate(st.session_state.partidos):
+        with st.expander(f"Partido: {partido['pareja1']} VS {partido['pareja2']}", expanded=not partido['jugado']):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                res1 = st.number_input(f"Sets {partido['pareja1']}", min_value=0, max_value=3, key=f"res1_{idx}")
+            with col2:
+                res2 = st.number_input(f"Sets {partido['pareja2']}", min_value=0, max_value=3, key=f"res2_{idx}")
+            
+            if st.button(f"Guardar Resultado {idx}", key=f"btn_{idx}"):
+                st.session_state.partidos[idx]['resultado1'] = res1
+                st.session_state.partidos[idx]['resultado2'] = res2
+                st.session_state.partidos[idx]['jugado'] = True
+                st.success("Resultado guardado")
+
+    # --- TABLA DE POSICIONES ---
+    st.divider()
+    st.subheader("📊 Clasificación")
+    # Aquí podrías añadir lógica para sumar puntos según los resultados guardados en st.session_state.partidos
+    st.info("Los datos se mantienen mientras la pestaña esté abierta. Para persistencia total (días), se requiere una base de datos.")
